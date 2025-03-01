@@ -2,3 +2,4 @@ venv/
 venv
 .history
 .history/
+.env
