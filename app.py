@@ -1,8 +1,9 @@
 import os
 from dotenv import load_dotenv
 from langchain_groq import ChatGroq
-from langchain.schema import SystemMessage, HumanMessage
+from langchain.schema import SystemMessage, HumanMessage, AIMessage
 from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain_community.chat_message_histories import ChatMessageHistory
 
 load_dotenv()
 
@@ -26,31 +27,50 @@ When responding:
 
 Your goal is to make complex bureaucratic processes accessible and understandable for elderly citizens who may not be familiar with digital systems or current procedures in Kerala. Always respond in Malayalam even if the query is in English."""
 
-
 groq_llm = ChatGroq(
     api_key=os.getenv("GROQ_API_KEY"),
     model_name="llama-3.3-70b-versatile",
     temperature=0.1
 )
 
+chat_history = ChatMessageHistory()
+
+# Update the prompt template to include history
 chat_prompt = ChatPromptTemplate.from_messages([
     ("system", SYSTEM_PROMPT),
-    MessagesPlaceholder(variable_name="human_input")
+    # Include conversation history
+    MessagesPlaceholder(variable_name="chat_history"),
+    ("human", "{input}"),
 ])
 
-# Replace LLMChain with pipe syntax
 chain = chat_prompt | groq_llm
 
 
 def process_user_query(user_input):
-    # Replace run with invoke
-    response = chain.invoke(
-        {"human_input": [HumanMessage(content=user_input)]})
-    # Extract content from the response
+    # Get current message history
+    history_messages = chat_history.messages
+    response = chain.invoke({
+        "chat_history": history_messages,
+        "input": user_input
+    })
+
+    chat_history.add_user_message(user_input)
+    chat_history.add_ai_message(response.content)
+
     return response.content
 
 
 if __name__ == "__main__":
-    user_query = "How can I apply for a new ration card"
-    response = process_user_query(user_query)
-    print(response)
+    print("Welcome to the Kerala Administrative Assistant!")
+    print("Ask questions about government procedures, documentation, or services.")
+    print("Type 'exit' or 'quit' to end the conversation.")
+
+    while True:
+        user_query = input("\nYour question: ")
+
+        if user_query.lower() in ['exit', 'quit']:
+            print("Thank you for using the Kerala Administrative Assistant. Goodbye!")
+            break
+
+        response = process_user_query(user_query)
+        print("\nResponse:", response)
